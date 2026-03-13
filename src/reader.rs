@@ -1,4 +1,42 @@
 //! PCAP and PCAPNG readers
+//!
+//! This module provides readers for parsing PCAP (legacy) and PCAPNG (modern)
+//! packet capture file formats.
+//!
+//! # PCAP Reader
+//!
+//! The [`PcapReader`] reads legacy PCAP files. It provides an iterator-style
+//! API for reading packets one at a time.
+//!
+//! ```ignore
+//! use capfile::PcapReader;
+//!
+//! let mut reader = PcapReader::open("capture.pcap")?;
+//! while let Some(packet) = reader.next_packet()? {
+//!     println!("Packet: {} bytes at {}", packet.len(), packet.timestamp_ns());
+//! }
+//! ```
+//!
+//! # PCAPNG Reader
+//!
+//! The [`PcapngReader`] reads modern PCAPNG files, which support multiple
+//! interfaces and more metadata than PCAP.
+//!
+//! ```ignore
+//! use capfile::PcapngReader;
+//! use capfile::format::pcapng::Block;
+//!
+//! let mut reader = PcapngReader::open("capture.pcapng")?;
+//! for iface in reader.interfaces() {
+//!     println!("Interface: snap_len={}", iface.snap_len);
+//! }
+//! while let Some(block) = reader.next_block()? {
+//!     match block {
+//!         Block::EnhancedPacket(epb) => { /* ... */ }
+//!         _ => {}
+//!     }
+//! }
+//! ```
 
 pub mod mmap;
 
