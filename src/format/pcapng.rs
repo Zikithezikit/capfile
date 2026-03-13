@@ -44,12 +44,12 @@ impl From<u32> for BlockType {
         match value {
             block_type::SHB => BlockType::SectionHeader,
             block_type::IDB => BlockType::InterfaceDescription,
-            block_type::PB  => BlockType::Packet,
+            block_type::PB => BlockType::Packet,
             block_type::SPB => BlockType::SimplePacket,
             block_type::NRB => BlockType::NameResolution,
             block_type::ISB => BlockType::InterfaceStatistics,
             block_type::EPB => BlockType::EnhancedPacket,
-            other      => BlockType::Unknown(other),
+            other => BlockType::Unknown(other),
         }
     }
 }
@@ -175,8 +175,8 @@ pub fn parse_block(input: &[u8], offset: usize) -> Result<(Block, usize), Error>
             }
             Block::SectionHeader(SectionHeaderBlock {
                 byte_order_magic,
-                version_major : read_u16(block_data, 4)?,
-                version_minor : read_u16(block_data, 6)?,
+                version_major: read_u16(block_data, 4)?,
+                version_minor: read_u16(block_data, 6)?,
                 section_length: read_i64(block_data, 8)?,
             })
         }
@@ -187,7 +187,7 @@ pub fn parse_block(input: &[u8], offset: usize) -> Result<(Block, usize), Error>
             Block::InterfaceDescription(InterfaceDescriptionBlock {
                 interface_id: 0, // Will be assigned by reader
                 link_type: read_u16(block_data, 0)?,
-                snap_len : read_u32(block_data, 4)?,
+                snap_len: read_u32(block_data, 4)?,
             })
         }
         BlockType::EnhancedPacket => {
@@ -205,9 +205,9 @@ pub fn parse_block(input: &[u8], offset: usize) -> Result<(Block, usize), Error>
             let data = block_data[20..20 + captured_len].to_vec();
 
             Block::EnhancedPacket(EnhancedPacketBlock {
-                interface_id   : read_u32(block_data, 0)?,
-                timestamp_high : read_u32(block_data, 4)?,
-                timestamp_low  : read_u32(block_data, 8)?,
+                interface_id: read_u32(block_data, 0)?,
+                timestamp_high: read_u32(block_data, 4)?,
+                timestamp_low: read_u32(block_data, 8)?,
                 captured_length: captured_len as u32,
                 original_length: read_u32(block_data, 16)?,
                 data,

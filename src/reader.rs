@@ -1,5 +1,7 @@
 //! PCAP and PCAPNG readers
 
+pub mod mmap;
+
 use crate::error::Error;
 use crate::format::pcap::PcapHeader;
 use crate::format::pcapng as pcapng_mod;

@@ -28,5 +28,7 @@ pub mod reader;
 pub mod writer;
 
 pub use error::Error;
+#[cfg(feature = "std")]
+pub use reader::mmap::PcapReaderMmap;
 pub use reader::{Interface, PacketRef, PcapReader, PcapngReader};
 pub use writer::{PcapWriter, PcapngWriter};
