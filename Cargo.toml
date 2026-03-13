@@ -1,0 +1,31 @@
+[package]
+name = "capfile"
+version = "0.1.0"
+edition = "2021"
+description = "Pure Rust crate for reading/writing pcap/pcapng files with zero-copy parsing"
+license = "MIT"
+authors = ["Capfile Contributors"]
+
+[dependencies]
+winnow = "0.6"
+memmap2 = "0.9"
+thiserror = "2"
+
+[dev-dependencies]
+cargo-fuzz = "0.11"
+
+[features]
+default = ["std"]
+std = []
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+
+[lib]
+name = "capfile"
+path = "src/lib.rs"
+
+[[bin]]
+name = "capfile"
+path = "src/main.rs"
