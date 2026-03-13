@@ -181,16 +181,16 @@ impl<R: Read + Seek> PcapngReader<R> {
     pub fn from_reader(mut reader: R) -> Result<Self, Error> {
         let mut interfaces = Vec::new();
 
-        // Read first block to verify it's a SHB
-        let mut initial_block = [0u8; 12];
-        reader.read_exact(&mut initial_block)?;
-
-        // Seek back to start
-        reader.seek(SeekFrom::Start(0))?;
-
         // Read all blocks to find interfaces
         loop {
-            let _current_pos = reader.stream_position()? as usize;
+            // Read block type (4 bytes)
+            let mut type_buf = [0u8; 4];
+            if reader.read_exact(&mut type_buf).is_err() {
+                break;
+            }
+            let block_type = u32::from_le_bytes(type_buf);
+
+            // Read block length (4 bytes)
             let mut len_buf = [0u8; 4];
             if reader.read_exact(&mut len_buf).is_err() {
                 break;
@@ -201,20 +201,30 @@ impl<R: Read + Seek> PcapngReader<R> {
                 break;
             }
 
-            let mut block_data = vec![0u8; block_len - 4];
+            // Read block content (block_len - 8 bytes, excluding type and length headers)
+            let content_len = block_len - 8;
+            let mut block_data = vec![0u8; content_len];
             reader.read_exact(&mut block_data)?;
 
-            // Parse block type
-            let block_type = read_u32(&block_data, 0)?;
-
             if block_type == pcapng_mod::block_type::IDB {
-                // Interface Description Block
-                let link_type = read_u16(&block_data, 4)?;
-                let snap_len = read_u32(&block_data, 8)?;
+                // Interface Description Block - link_type at offset 0, snap_len at offset 4
+                let link_type = read_u16(&block_data, 0)?;
+                let snap_len = read_u32(&block_data, 4)?;
                 interfaces.push(Interface {
                     link_type,
                     snap_len,
                 });
+            }
+
+            // Skip the trailing block length (4 bytes) if not already consumed
+            // Actually, we already read content_len = block_len - 8, so we're at the trailer
+            // The trailer is 4 bytes, so total read is 4 + 4 + (block_len - 8) + 4 = block_len + 4
+            // We need to consume the remaining trailer bytes
+            if content_len + 8 < block_len {
+                let trailer_len = block_len - (content_len + 8);
+                if trailer_len > 0 {
+                    reader.seek(SeekFrom::Current(trailer_len as i64))?;
+                }
             }
         }
 
