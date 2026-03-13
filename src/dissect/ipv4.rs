@@ -136,3 +136,67 @@ pub mod protocol {
     pub const TCP: u8 = 6;
     pub const UDP: u8 = 17;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ipv4_new_valid() {
+        // IPv4 packet with minimum header (20 bytes)
+        let data = vec![
+            0x45, // version=4, IHL=5 (20 bytes)
+            0x00, // TOS
+            0x00, 0x28, // total length = 40
+            0x00, 0x01, // identification
+            0x40, 0x00, // flags=DF, fragment offset=0
+            0x40, // TTL = 64
+            0x06, // protocol = TCP
+            0x00, 0x00, // checksum (placeholder)
+            0xc0, 0xa8, 0x01, 0x01, // src IP = 192.168.1.1
+            0xc0, 0xa8, 0x01, 0x02, // dst IP = 192.168.1.2
+        ];
+        let ip = Ipv4::new(&data).unwrap();
+        assert_eq!(ip.version(), 4);
+        assert_eq!(ip.ihl(), 20);
+        assert_eq!(ip.protocol(), 6);
+    }
+
+    #[test]
+    fn test_ipv4_new_truncated() {
+        let data = vec![0u8; 10];
+        let result = Ipv4::new(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ipv4_new_invalid_version() {
+        let mut data = vec![0u8; 20];
+        data[0] = 0x60; // version=6, not 4
+        let result = Ipv4::new(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_ipv4_addresses() {
+        let data = vec![
+            0x45, 0x00, 0x00, 0x28, 0x00, 0x01, 0x40, 0x00, 0x40, 0x06, 0x00, 0x00, 0xc0, 0xa8,
+            0x01, 0x01, // src = 192.168.1.1
+            0xc0, 0xa8, 0x01, 0x02, // dst = 192.168.1.2
+        ];
+        let ip = Ipv4::new(&data).unwrap();
+        assert_eq!(ip.src_str(), "192.168.1.1");
+        assert_eq!(ip.dst_str(), "192.168.1.2");
+    }
+
+    #[test]
+    fn test_ipv4_payload() {
+        let mut data = vec![
+            0x45, 0x00, 0x00, 0x28, 0x00, 0x01, 0x40, 0x00, 0x40, 0x06, 0x00, 0x00, 0xc0, 0xa8,
+            0x01, 0x01, 0xc0, 0xa8, 0x01, 0x02,
+        ];
+        data.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]); // payload
+        let ip = Ipv4::new(&data).unwrap();
+        assert_eq!(ip.payload(), &[0xde, 0xad, 0xbe, 0xef]);
+    }
+}

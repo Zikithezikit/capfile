@@ -119,3 +119,63 @@ impl<'a> Dissect<'a> for Tcp<'a> {
         self.data_offset()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tcp_new_valid() {
+        // TCP segment with minimum header (20 bytes)
+        let data = vec![
+            0x00, 0x50, // src port = 80
+            0x01, 0xbb, // dst port = 443
+            0x00, 0x00, 0x00, 0x00, // seq = 0
+            0x00, 0x00, 0x00, 0x00, // ack = 0
+            0x50, 0x02, // data offset = 20, flags = SYN
+            0x00, 0x00, // window = 0
+            0x00, 0x00, // checksum
+            0x00, 0x00, // urgent
+        ];
+        let tcp = Tcp::new(&data).unwrap();
+        assert_eq!(tcp.src_port(), 80);
+        assert_eq!(tcp.dst_port(), 443);
+        assert!(tcp.syn());
+    }
+
+    #[test]
+    fn test_tcp_new_truncated() {
+        let data = vec![0u8; 10];
+        let result = Tcp::new(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_tcp_flags() {
+        // TCP header is 20 bytes minimum
+        let data = vec![
+            0x00, 0x50, // src port = 80
+            0x01, 0xbb, // dst port = 443
+            0x00, 0x00, 0x00, 0x00, // seq = 0
+            0x00, 0x00, 0x00, 0x00, // ack = 0
+            0x50, 0x12, // data offset = 20, flags = SYN+ACK
+            0x00, 0x00, // window = 0
+            0x00, 0x00, // checksum
+            0x00, 0x00, // urgent pointer
+        ];
+        let tcp = Tcp::new(&data).unwrap();
+        assert!(tcp.syn());
+        assert!(tcp.ack_flag());
+    }
+
+    #[test]
+    fn test_tcp_payload() {
+        let mut data = vec![
+            0x00, 0x50, 0x01, 0xbb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x02,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        data.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]); // payload
+        let tcp = Tcp::new(&data).unwrap();
+        assert_eq!(tcp.payload(), &[0xde, 0xad, 0xbe, 0xef]);
+    }
+}

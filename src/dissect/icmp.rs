@@ -78,3 +78,45 @@ pub mod icmp_type {
     pub const TIMESTAMP_REQUEST: u8 = 13;
     pub const TIMESTAMP_REPLY: u8 = 14;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_icmp_new_valid() {
+        // ICMP echo request (ping)
+        let data = vec![
+            0x08, // type = echo request
+            0x00, // code = 0
+            0x00, 0x00, // checksum
+            0x00, 0x01, // identifier
+            0x00, 0x01, // sequence number
+        ];
+        let icmp = Icmp::new(&data).unwrap();
+        assert_eq!(icmp.icmp_type(), 8); // ECHO_REQUEST
+    }
+
+    #[test]
+    fn test_icmp_new_truncated() {
+        let data = vec![0u8; 4];
+        let result = Icmp::new(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_icmp_types() {
+        let data = vec![0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01];
+        let icmp = Icmp::new(&data).unwrap();
+        assert_eq!(icmp.icmp_type(), icmp_type::ECHO_REQUEST);
+        assert_eq!(icmp.code(), 0);
+    }
+
+    #[test]
+    fn test_icmp_payload() {
+        let mut data = vec![0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01];
+        data.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]); // payload
+        let icmp = Icmp::new(&data).unwrap();
+        assert_eq!(icmp.payload(), &[0xde, 0xad, 0xbe, 0xef]);
+    }
+}

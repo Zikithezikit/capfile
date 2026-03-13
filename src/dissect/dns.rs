@@ -89,3 +89,73 @@ impl<'a> Dissect<'a> for Dns<'a> {
         12
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dns_new_valid() {
+        // DNS query (12-byte header)
+        let data = vec![
+            0x12, 0x34, // transaction ID
+            0x01, 0x00, // flags: standard query
+            0x00, 0x01, // 1 question
+            0x00, 0x00, // 0 answers
+            0x00, 0x00, // 0 authority
+            0x00, 0x00, // 0 additional
+        ];
+        let dns = Dns::new(&data).unwrap();
+        assert_eq!(dns.id(), 0x1234);
+        assert!(!dns.is_response());
+    }
+
+    #[test]
+    fn test_dns_new_truncated() {
+        let data = vec![0u8; 8];
+        let result = Dns::new(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_dns_flags() {
+        let data = vec![
+            0x12, 0x34, // transaction ID
+            0x81, 0x80, // flags: response, no error
+            0x00, 0x01, // 1 question
+            0x00, 0x01, // 1 answer
+            0x00, 0x00, // 0 authority
+            0x00, 0x00, // 0 additional
+        ];
+        let dns = Dns::new(&data).unwrap();
+        assert!(dns.is_response());
+        assert_eq!(dns.rcode(), 0); // no error
+    }
+
+    #[test]
+    fn test_dns_counts() {
+        let data = vec![
+            0x00, 0x00, // ID
+            0x01, 0x00, // flags
+            0x00, 0x02, // 2 questions
+            0x00, 0x03, // 3 answers
+            0x00, 0x04, // 4 authority
+            0x00, 0x05, // 5 additional
+        ];
+        let dns = Dns::new(&data).unwrap();
+        assert_eq!(dns.qd_count(), 2);
+        assert_eq!(dns.an_count(), 3);
+        assert_eq!(dns.ns_count(), 4);
+        assert_eq!(dns.ar_count(), 5);
+    }
+
+    #[test]
+    fn test_dns_payload() {
+        let mut data = vec![
+            0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        data.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]); // payload
+        let dns = Dns::new(&data).unwrap();
+        assert_eq!(dns.payload(), &[0xde, 0xad, 0xbe, 0xef]);
+    }
+}
