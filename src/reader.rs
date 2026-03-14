@@ -235,7 +235,7 @@ impl<R: Read + Seek> PcapngReader<R> {
             }
             let block_len = u32::from_le_bytes(len_buf) as usize;
 
-            if block_len < 12 || block_len > 1024 * 1024 {
+            if !(12..=1024 * 1024).contains(&block_len) {
                 break;
             }
 

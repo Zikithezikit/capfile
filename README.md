@@ -29,7 +29,7 @@ while let Some(pkt) = reader.next_packet()? {
 }
 ```
 
-### Reading from bytes (no_std/WASM)
+### Reading from bytes
 
 ```rust
 use capfile::PcapReader;
@@ -118,13 +118,9 @@ let iface_id = writer.write_interface(1, 65535)?; // Ethernet, snap_len = 65535
 writer.write_packet(iface_id, b"packet data", 1_000_000_000, 14, 14)?;
 ```
 
-## Feature Flags
-
-- `std` (default): Enables file system access. Without this feature, you can only parse from in-memory byte slices.
-
 ## Requirements
 
-- Rust 1.70 or later
+- Rust 1.85 or later
 
 ## License
 

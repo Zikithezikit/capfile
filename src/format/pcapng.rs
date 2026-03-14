@@ -384,7 +384,7 @@ mod tests {
     #[test]
     fn test_parse_shb() {
         // Minimal SHB: block type (4) + block length (4) + byte-order (4) + version (4) + section length (8) + block length (4)
-        let mut data = vec![
+        let data = vec![
             // Block type (SHB)
             0x0a, 0x0d, 0x0d, 0x0a, // Block length (28 bytes)
             0x1c, 0x00, 0x00, 0x00, // Byte-order magic
@@ -395,7 +395,7 @@ mod tests {
             0x1c, 0x00, 0x00, 0x00,
         ];
 
-        let (block, _) = parse_block(&mut data, 0).unwrap();
+        let (block, _) = parse_block(&data, 0).unwrap();
         match block {
             Block::SectionHeader(shb) => {
                 assert_eq!(shb.byte_order_magic, PCAPNG_BYTE_ORDER_MAGIC);
@@ -412,7 +412,7 @@ mod tests {
     fn test_parse_idb() {
         // IDB format: [type:4][length:4][link_type:2][pad:2][snap_len:4][options:4][length:4]
         // Total: 4 + 4 + 2 + 2 + 4 + 4 + 4 = 24 bytes
-        let mut data = vec![
+        let data = vec![
             // Block type (IDB = 1)
             0x01, 0x00, 0x00, 0x00, // Block length (24 = 0x18)
             0x18, 0x00, 0x00, 0x00, // Link type (Ethernet = 1)
@@ -426,7 +426,7 @@ mod tests {
 
         assert_eq!(data.len(), 24, "IDB should be exactly 24 bytes");
 
-        let (block, _) = parse_block(&mut data, 0).unwrap();
+        let (block, _) = parse_block(&data, 0).unwrap();
         match block {
             Block::InterfaceDescription(idb) => {
                 assert_eq!(idb.link_type, 1);
@@ -463,13 +463,14 @@ mod tests {
         // Packet data
         data.extend_from_slice(&packet_data);
         // Padding (to 4-byte boundary)
+        #[allow(clippy::manual_is_multiple_of)]
         while data.len() % 4 != 0 {
             data.push(0);
         }
         // Block length (repeated)
         data.extend_from_slice(&(block_len as u32).to_le_bytes());
 
-        let (block, _) = parse_block(&mut data, 0).unwrap();
+        let (block, _) = parse_block(&data, 0).unwrap();
         match block {
             Block::EnhancedPacket(epb) => {
                 assert_eq!(epb.interface_id, 0);
@@ -495,19 +496,19 @@ mod tests {
     /// Test invalid block length
     #[test]
     fn test_parse_invalid_block_length() {
-        let mut data = vec![
+        let data = vec![
             0x0a, 0x0d, 0x0d, 0x0a, // SHB
             0x00, 0x00, 0x00, 0x00, // Invalid block length (0)
         ];
 
-        let result = parse_block(&mut data, 0);
+        let result = parse_block(&data, 0);
         assert!(result.is_err());
     }
 
     /// Test invalid byte-order magic
     #[test]
     fn test_parse_invalid_byte_order() {
-        let mut data = vec![
+        let data = vec![
             0x0a, 0x0d, 0x0d, 0x0a, // SHB
             0x10, 0x00, 0x00, 0x00, // Block length (16)
             0x00, 0x00, 0x00, 0x00, // Invalid byte-order magic
@@ -516,7 +517,7 @@ mod tests {
             0x10, 0x00, 0x00, 0x00, // Block length (repeated)
         ];
 
-        let result = parse_block(&mut data, 0);
+        let result = parse_block(&data, 0);
         assert!(result.is_err());
     }
 }

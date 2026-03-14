@@ -41,31 +41,18 @@ jobs:
 
   # Build and test on MSRV
   test-msrv:
-    name: Test MSRV (1.70)
+    name: Test MSRV (1.85)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.70
+        uses: dtolnay/rust-toolchain@1.85
         with:
           components: rustfmt, clippy
 
       - name: Run tests
         run: cargo test --all
-
-  # Build with no_std
-  test-no_std:
-    name: Test no_std
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build no_std
-        run: cargo build --no-default-features --lib
 
   # Build on multiple platforms
   test-multi-platform:

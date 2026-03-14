@@ -8,13 +8,13 @@ fn main() {
 
     if args.len() < 2 {
         println!("Capfile - Pure Rust pcap/pcapng library");
-        println!("");
+        println!();
         println!("Usage: capfile <command> [options]");
-        println!("");
+        println!();
         println!("Commands:");
         println!("  info <file>    - Display file info (magic, version, link type)");
         println!("  list <file>    - List packets in capture file");
-        println!("");
+        println!();
         println!("Examples:");
         println!("  capfile info capture.pcap");
         println!("  capfile list capture.pcapng");
