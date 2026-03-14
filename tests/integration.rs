@@ -68,7 +68,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Known issue with PcapngReader interface detection
     fn test_pcapng_fixture_read() {
         use capfile::format::pcapng::Block;
         use capfile::PcapngReader;

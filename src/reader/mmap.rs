@@ -21,6 +21,10 @@ impl PcapReaderMmap {
     /// Open a pcap file with memory mapping
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let file = File::open(path)?;
+        // SAFETY: memmap2::Mmap::map is unsafe because it assumes the file
+        // won't change during the lifetime of the mapping. We hold the file
+        // open for the duration of the mapping's lifetime, ensuring safety.
+        // The file is valid for the entire duration of this reader.
         let data = unsafe { Mmap::map(&file)? };
 
         let (header, _) = PcapHeader::parse(&data)?;

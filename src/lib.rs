@@ -11,13 +11,6 @@
 //! - **Packet dissection**: Built-in support for dissecting Ethernet, IPv4,
 //!   IPv6, TCP, UDP, ICMP, and DNS protocols
 //! - **Write support**: Create new PCAP and PCAPNG files
-//! - **no_std support**: Works without the standard library for embedded
-//! - **WASM compatible**: Can be used in WebAssembly applications
-//!
-//! # Feature Flags
-//!
-//! - `std`: Enables file system access (enabled by default). Without this
-//!   feature, you can only parse from in-memory byte slices.
 //!
 //! # Quick Start
 //!
@@ -117,8 +110,6 @@
 //! - [`reader`] - PCAP and PCAPNG readers
 //! - [`writer`] - PCAP and PCAPNG writers
 //! - `dissect` - Packet dissection for various protocols
-
-#![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod dissect;
 pub mod error;

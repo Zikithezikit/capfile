@@ -239,10 +239,14 @@ impl<R: Read + Seek> PcapngReader<R> {
                 break;
             }
 
-            // Read block content (block_len - 8 bytes, excluding type and length headers)
-            let content_len = block_len - 8;
+            // Read block content.
+            // Total = type(4) + length1(4) + content + length2(4) = block_len
+            // So content = block_len - 12
+            let content_len = block_len - 12;
             let mut block_data = vec![0u8; content_len];
-            reader.read_exact(&mut block_data)?;
+            if reader.read_exact(&mut block_data).is_err() {
+                break;
+            }
 
             if block_type == pcapng_mod::block_type::IDB {
                 // Interface Description Block - link_type at offset 0, snap_len at offset 4
@@ -254,11 +258,8 @@ impl<R: Read + Seek> PcapngReader<R> {
                 });
             }
 
-            // Read trailing block length (4 bytes)
-            let mut trailer = [0u8; 4];
-            if reader.read_exact(&mut trailer).is_err() {
-                break;
-            }
+            // Skip the trailer (4 bytes)
+            reader.seek(SeekFrom::Current(4))?;
         }
 
         reader.seek(SeekFrom::Start(0))?;
@@ -280,6 +281,7 @@ impl<R: Read + Seek> PcapngReader<R> {
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
             Err(e) => return Err(Error::Io(e)),
         }
+        let _block_type = u32::from_le_bytes(type_buf);
 
         // Read block length (4 bytes)
         let mut len_buf = [0u8; 4];
@@ -295,21 +297,34 @@ impl<R: Read + Seek> PcapngReader<R> {
             return Err(Error::parse(0, "Block too small"));
         }
 
-        // Read block content (block_len - 8 bytes, excluding type and length headers)
-        let content_len = block_len - 8;
-        let mut block_data = vec![0u8; content_len];
-        self.reader.read_exact(&mut block_data)?;
-
-        // Read trailing block length (4 bytes)
-        let mut trailer = [0u8; 4];
-        if self.reader.read_exact(&mut trailer).is_err() {
+        // Build full block data for parse_block:
+        // parse_block expects: type(4) + length(4) + content + trailing_length(4) = block_len
+        let mut full_block = vec![0u8; block_len];
+        full_block[0..4].copy_from_slice(&type_buf);
+        full_block[4..8].copy_from_slice(&len_buf);
+        // Read content into full_block[8..block_len-4]
+        if self
+            .reader
+            .read_exact(&mut full_block[8..block_len - 4])
+            .is_err()
+        {
+            return Ok(None);
+        }
+        // Read trailing length into full_block[block_len-4..block_len]
+        if self
+            .reader
+            .read_exact(&mut full_block[block_len - 4..block_len])
+            .is_err()
+        {
             return Ok(None);
         }
 
         let offset = 0;
-        let (block, _) = pcapng_mod::parse_block(&block_data, offset)?;
-
-        Ok(Some(block))
+        let result = pcapng_mod::parse_block(&full_block, offset);
+        match result {
+            Ok((block, _)) => Ok(Some(block)),
+            Err(_) => Ok(None),
+        }
     }
 }
 

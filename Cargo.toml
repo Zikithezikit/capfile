@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Pure Rust crate for reading/writing pcap/pcapng files with zero-copy parsing"
 license = "MIT"
-authors = ["Capfile Contributors"]
+authors = ["Yoav Haimov <haimovyoav@gmail.com>"]
 
 [dependencies]
 winnow = "0.6"
@@ -13,6 +13,10 @@ thiserror = "2"
 
 [dev-dependencies]
 cargo-fuzz = "0.11"
+
+[profile.release]
+lto = true
+codegen-units = 1
 
 [features]
 default = ["std"]
