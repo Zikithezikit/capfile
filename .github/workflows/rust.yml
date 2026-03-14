@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # Check formatting and clippy
@@ -56,22 +57,17 @@ jobs:
 
   # Build on multiple platforms
   test-multi-platform:
-    name: Test ${{ matrix.platform }}
+    name: Test ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
-          - { os: macos-latest, target: x86_64-apple-darwin }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform.target }}
 
       - name: Build
         run: cargo build --all
