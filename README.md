@@ -124,7 +124,7 @@ writer.write_packet(iface_id, b"packet data", 1_000_000_000, 14, 14)?;
 
 ## Requirements
 
-- Rust 1.80 or later
+- Rust 1.85 or later
 
 ## License
 

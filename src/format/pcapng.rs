@@ -443,7 +443,7 @@ mod tests {
         let packet_data = vec![0xde, 0xad, 0xbe, 0xef];
         let block_len = 32 + packet_data.len(); // 20 bytes header + data + padding + 4 block length
 
-        let data = vec![
+        let mut data = vec![
             // Block type (EPB)
             0x06, 0x00, 0x00, 0x00,
             // Block length
