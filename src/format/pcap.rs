@@ -310,7 +310,7 @@ mod tests {
     /// Test packet parsing
     #[test]
     fn test_parse_packet() {
-        let mut data = vec![
+        let data = vec![
             // Packet header
             0xd2, 0x02, 0x96, 0x49, // ts_sec
             0xe8, 0x01, 0x00, 0x00, // ts_usec
