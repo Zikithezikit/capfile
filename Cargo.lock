@@ -75,7 +75,7 @@ dependencies = [
 
 [[package]]
 name = "capfile"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "cargo-fuzz",
  "memmap2",
