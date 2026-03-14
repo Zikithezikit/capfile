@@ -463,7 +463,8 @@ mod tests {
         // Packet data
         data.extend_from_slice(&packet_data);
         // Padding (to 4-byte boundary)
-        while !data.len().is_multiple_of(4) {
+        #[allow(clippy::manual_is_multiple_of)]
+        while data.len() % 4 != 0 {
             data.push(0);
         }
         // Block length (repeated)
