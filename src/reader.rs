@@ -1,0 +1,363 @@
+//! PCAP and PCAPNG readers
+//!
+//! This module provides readers for parsing PCAP (legacy) and PCAPNG (modern)
+//! packet capture file formats.
+//!
+//! # PCAP Reader
+//!
+//! The [`PcapReader`] reads legacy PCAP files. It provides an iterator-style
+//! API for reading packets one at a time.
+//!
+//! ```ignore
+//! use capfile::PcapReader;
+//!
+//! let mut reader = PcapReader::open("capture.pcap")?;
+//! while let Some(packet) = reader.next_packet()? {
+//!     println!("Packet: {} bytes at {}", packet.len(), packet.timestamp_ns());
+//! }
+//! ```
+//!
+//! # PCAPNG Reader
+//!
+//! The [`PcapngReader`] reads modern PCAPNG files, which support multiple
+//! interfaces and more metadata than PCAP.
+//!
+//! ```ignore
+//! use capfile::PcapngReader;
+//! use capfile::format::pcapng::Block;
+//!
+//! let mut reader = PcapngReader::open("capture.pcapng")?;
+//! for iface in reader.interfaces() {
+//!     println!("Interface: snap_len={}", iface.snap_len);
+//! }
+//! while let Some(block) = reader.next_block()? {
+//!     match block {
+//!         Block::EnhancedPacket(epb) => { /* ... */ }
+//!         _ => {}
+//!     }
+//! }
+//! ```
+
+pub mod mmap;
+
+use crate::error::Error;
+use crate::format::pcap::PcapHeader;
+use crate::format::pcapng as pcapng_mod;
+use crate::format::pcapng::Block;
+
+#[cfg(feature = "std")]
+use std::fs::File;
+#[cfg(feature = "std")]
+use std::io::{Read, Seek, SeekFrom};
+#[cfg(feature = "std")]
+use std::path::Path;
+
+/// Read a u32 from little-endian bytes safely
+fn read_u32(data: &[u8], offset: usize) -> Result<u32, Error> {
+    if data.len() < offset + 4 {
+        return Err(Error::truncated(offset + 4, data.len()));
+    }
+    Ok(u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ]))
+}
+
+/// Read a u16 from little-endian bytes safely
+fn read_u16(data: &[u8], offset: usize) -> Result<u16, Error> {
+    if data.len() < offset + 2 {
+        return Err(Error::truncated(offset + 2, data.len()));
+    }
+    Ok(u16::from_le_bytes([data[offset], data[offset + 1]]))
+}
+
+/// Zero-copy reference to packet data
+#[derive(Debug, Clone)]
+pub struct PacketRef {
+    data: Vec<u8>,
+    timestamp_ns: u64,
+    original_len: u32,
+    captured_len: u32,
+}
+
+impl PacketRef {
+    /// Create a new packet reference
+    pub fn new(data: &[u8], timestamp_ns: u64, original_len: u32, captured_len: u32) -> Self {
+        Self {
+            data: data.to_vec(),
+            timestamp_ns,
+            original_len,
+            captured_len,
+        }
+    }
+
+    /// Get packet data
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Get timestamp in nanoseconds since epoch
+    pub fn timestamp_ns(&self) -> u64 {
+        self.timestamp_ns
+    }
+
+    /// Get captured length
+    pub fn captured_len(&self) -> u32 {
+        self.captured_len
+    }
+
+    /// Get original length
+    pub fn original_len(&self) -> u32 {
+        self.original_len
+    }
+
+    /// Get packet length
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Check if packet is empty
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+}
+
+/// PCAP reader
+pub struct PcapReader<R> {
+    reader: R,
+    header: PcapHeader,
+    is_nano: bool,
+}
+
+impl<R: Read + Seek> PcapReader<R> {
+    /// Open a pcap file from a reader
+    pub fn from_reader(reader: R) -> Result<Self, Error> {
+        let mut reader = reader;
+        let mut header_buf = [0u8; 24];
+        reader.read_exact(&mut header_buf)?;
+
+        let (header, _) = PcapHeader::parse(&header_buf)?;
+
+        Ok(Self {
+            reader,
+            header,
+            is_nano: header.is_nano(),
+        })
+    }
+
+    /// Get the pcap header
+    pub fn header(&self) -> PcapHeader {
+        self.header
+    }
+
+    /// Get link type
+    pub fn link_type(&self) -> u32 {
+        self.header.network
+    }
+
+    /// Read the next packet
+    pub fn next_packet(&mut self) -> Result<Option<PacketRef>, Error> {
+        let mut pkthdr_buf = [0u8; 16];
+        match self.reader.read_exact(&mut pkthdr_buf) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(Error::Io(e)),
+        }
+
+        let ts_sec = read_u32(&pkthdr_buf, 0)?;
+        let ts_usec = read_u32(&pkthdr_buf, 4)?;
+        let incl_len = read_u32(&pkthdr_buf, 8)?;
+        let orig_len = read_u32(&pkthdr_buf, 12)?;
+
+        let timestamp_ns = if self.is_nano {
+            (ts_sec as u64) * 1_000_000_000 + ts_usec as u64
+        } else {
+            (ts_sec as u64) * 1_000_000_000 + (ts_usec as u64) * 1000
+        };
+
+        let mut pkt_data = vec![0u8; incl_len as usize];
+        self.reader.read_exact(&mut pkt_data)?;
+
+        Ok(Some(PacketRef::new(
+            &pkt_data,
+            timestamp_ns,
+            orig_len,
+            incl_len,
+        )))
+    }
+}
+
+/// Iterator over packets in a pcap file
+pub struct PcapIterator<R> {
+    reader: PcapReader<R>,
+}
+
+impl<R: Read + Seek> Iterator for PcapIterator<R> {
+    type Item = Result<PacketRef, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.reader.next_packet().transpose()
+    }
+}
+
+/// PCAPNG reader
+pub struct PcapngReader<R> {
+    reader: R,
+    interfaces: Vec<Interface>,
+}
+
+/// Interface information for pcapng
+pub struct Interface {
+    pub link_type: u16,
+    pub snap_len: u32,
+}
+
+impl<R: Read + Seek> PcapngReader<R> {
+    /// Open a pcapng file from a reader
+    pub fn from_reader(mut reader: R) -> Result<Self, Error> {
+        let mut interfaces = Vec::new();
+
+        // Read all blocks to find interfaces
+        loop {
+            // Read block type (4 bytes)
+            let mut type_buf = [0u8; 4];
+            if reader.read_exact(&mut type_buf).is_err() {
+                break;
+            }
+            let block_type = u32::from_le_bytes(type_buf);
+
+            // Read block length (4 bytes)
+            let mut len_buf = [0u8; 4];
+            if reader.read_exact(&mut len_buf).is_err() {
+                break;
+            }
+            let block_len = u32::from_le_bytes(len_buf) as usize;
+
+            if block_len < 12 || block_len > 1024 * 1024 {
+                break;
+            }
+
+            // Read block content.
+            // Total = type(4) + length1(4) + content + length2(4) = block_len
+            // So content = block_len - 12
+            let content_len = block_len - 12;
+            let mut block_data = vec![0u8; content_len];
+            if reader.read_exact(&mut block_data).is_err() {
+                break;
+            }
+
+            if block_type == pcapng_mod::block_type::IDB {
+                // Interface Description Block - link_type at offset 0, snap_len at offset 4
+                let link_type = read_u16(&block_data, 0)?;
+                let snap_len = read_u32(&block_data, 4)?;
+                interfaces.push(Interface {
+                    link_type,
+                    snap_len,
+                });
+            }
+
+            // Skip the trailer (4 bytes)
+            reader.seek(SeekFrom::Current(4))?;
+        }
+
+        reader.seek(SeekFrom::Start(0))?;
+
+        Ok(Self { reader, interfaces })
+    }
+
+    /// Get interfaces
+    pub fn interfaces(&self) -> &[Interface] {
+        &self.interfaces
+    }
+
+    /// Read the next block
+    pub fn next_block(&mut self) -> Result<Option<Block>, Error> {
+        // Read block type (4 bytes)
+        let mut type_buf = [0u8; 4];
+        match self.reader.read_exact(&mut type_buf) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(Error::Io(e)),
+        }
+        let _block_type = u32::from_le_bytes(type_buf);
+
+        // Read block length (4 bytes)
+        let mut len_buf = [0u8; 4];
+        match self.reader.read_exact(&mut len_buf) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) => return Err(Error::Io(e)),
+        }
+
+        let block_len = u32::from_le_bytes(len_buf) as usize;
+
+        if block_len < 12 {
+            return Err(Error::parse(0, "Block too small"));
+        }
+
+        // Build full block data for parse_block:
+        // parse_block expects: type(4) + length(4) + content + trailing_length(4) = block_len
+        let mut full_block = vec![0u8; block_len];
+        full_block[0..4].copy_from_slice(&type_buf);
+        full_block[4..8].copy_from_slice(&len_buf);
+        // Read content into full_block[8..block_len-4]
+        if self
+            .reader
+            .read_exact(&mut full_block[8..block_len - 4])
+            .is_err()
+        {
+            return Ok(None);
+        }
+        // Read trailing length into full_block[block_len-4..block_len]
+        if self
+            .reader
+            .read_exact(&mut full_block[block_len - 4..block_len])
+            .is_err()
+        {
+            return Ok(None);
+        }
+
+        let offset = 0;
+        let result = pcapng_mod::parse_block(&full_block, offset);
+        match result {
+            Ok((block, _)) => Ok(Some(block)),
+            Err(_) => Ok(None),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl PcapReader<std::io::Cursor<Vec<u8>>> {
+    /// Create a reader from bytes (for embedded/WASM use)
+    pub fn from_bytes(data: &[u8]) -> Result<Self, Error> {
+        Self::from_reader(std::io::Cursor::new(data.to_vec()))
+    }
+}
+
+#[cfg(feature = "std")]
+impl PcapngReader<std::io::Cursor<Vec<u8>>> {
+    /// Create a reader from bytes (for embedded/WASM use)
+    pub fn from_bytes(data: &[u8]) -> Result<Self, Error> {
+        Self::from_reader(std::io::Cursor::new(data.to_vec()))
+    }
+}
+
+#[cfg(feature = "std")]
+impl PcapReader<File> {
+    /// Open a pcap file
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let file = File::open(path)?;
+        Self::from_reader(file)
+    }
+}
+
+#[cfg(feature = "std")]
+impl PcapngReader<File> {
+    /// Open a pcapng file
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let file = File::open(path)?;
+        Self::from_reader(file)
+    }
+}
