@@ -3,7 +3,7 @@
 [![Rust](https://github.com/Zikithezikit/capfile/actions/workflows/rust.yml/badge.svg)](https://github.com/Zikithezikit/capfile/actions/workflows/rust.yml)
 [![crates.io](https://img.shields.io/crates/v/capfile.svg)](https://crates.io/crates/capfile)
 [![docs.rs](https://docs.rs/capfile/badge.svg)](https://docs.rs/capfile)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A pure Rust crate for reading and writing pcap/pcapng capture files with zero-copy parsing and built-in packet dissection.
 
@@ -128,4 +128,4 @@ writer.write_packet(iface_id, b"packet data", 1_000_000_000, 14, 14)?;
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Apache License 2.0 - see [LICENSE](LICENSE) for details.

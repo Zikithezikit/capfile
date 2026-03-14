@@ -3,7 +3,7 @@ name = "capfile"
 version = "0.1.0"
 edition = "2021"
 description = "Pure Rust crate for reading/writing pcap/pcapng files with zero-copy parsing"
-license = "MIT"
+license = "Apache-2.0"
 authors = ["Yoav Haimov <haimovyoav@gmail.com>"]
 
 [dependencies]
