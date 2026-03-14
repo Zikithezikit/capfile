@@ -320,7 +320,7 @@ mod tests {
             0xde, 0xad, 0xbe, 0xef,
         ];
 
-        let (data_out, rest) = parse_packet(&mut data).unwrap();
+        let (data_out, _rest) = parse_packet(&data).unwrap();
         assert_eq!(data_out, &[0xde, 0xad, 0xbe, 0xef]);
     }
 

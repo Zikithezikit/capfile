@@ -395,7 +395,7 @@ mod tests {
             0x1c, 0x00, 0x00, 0x00,
         ];
 
-        let (block, _) = parse_block(&mut data, 0).unwrap();
+        let (block, _) = parse_block(&data, 0).unwrap();
         match block {
             Block::SectionHeader(shb) => {
                 assert_eq!(shb.byte_order_magic, PCAPNG_BYTE_ORDER_MAGIC);
@@ -426,7 +426,7 @@ mod tests {
 
         assert_eq!(data.len(), 24, "IDB should be exactly 24 bytes");
 
-        let (block, _) = parse_block(&mut data, 0).unwrap();
+        let (block, _) = parse_block(&data, 0).unwrap();
         match block {
             Block::InterfaceDescription(idb) => {
                 assert_eq!(idb.link_type, 1);
@@ -463,13 +463,13 @@ mod tests {
         // Packet data
         data.extend_from_slice(&packet_data);
         // Padding (to 4-byte boundary)
-        while data.len() % 4 != 0 {
+        while !data.len().is_multiple_of(4) {
             data.push(0);
         }
         // Block length (repeated)
         data.extend_from_slice(&(block_len as u32).to_le_bytes());
 
-        let (block, _) = parse_block(&mut data, 0).unwrap();
+        let (block, _) = parse_block(&data, 0).unwrap();
         match block {
             Block::EnhancedPacket(epb) => {
                 assert_eq!(epb.interface_id, 0);
@@ -500,7 +500,7 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, // Invalid block length (0)
         ];
 
-        let result = parse_block(&mut data, 0);
+        let result = parse_block(&data, 0);
         assert!(result.is_err());
     }
 
@@ -516,7 +516,7 @@ mod tests {
             0x10, 0x00, 0x00, 0x00, // Block length (repeated)
         ];
 
-        let result = parse_block(&mut data, 0);
+        let result = parse_block(&data, 0);
         assert!(result.is_err());
     }
 }
